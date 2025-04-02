@@ -34,7 +34,7 @@ RealCard2EnvCard = {'3': '3', '4': '4', '5': '5', '6': '6', '7': '7',
                     '8': '8', '9': '9', 'T': 'T', 'J': 'J', 'Q': 'Q',
                     'K': 'K', 'A': 'A', '2': '2', 'X': 'B', 'D': 'R'}
 
-pretrained_dir = 'pretrained/dmc_pretrained'
+pretrained_dir = '/app/pve_server/pretrained/dmc_pretrained'
 device = torch.device('cpu')
 players = []
 for i in range(3):
@@ -416,8 +416,4 @@ def _process_action_seq(sequence, length=9):
 
 
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description='DouZero backend')
-    parser.add_argument('--debug', action='store_true')
-    args = parser.parse_args()
-    app.run(debug=args.debug)
+    app.run(host='0.0.0.0', port=5000)

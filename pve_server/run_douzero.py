@@ -18,7 +18,7 @@ RealCard2EnvCard = {'3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
                     '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12,
                     'K': 13, 'A': 14, '2': 17, 'X': 20, 'D': 30}
 
-pretrained_dir = 'pretrained/douzero_pretrained'
+pretrained_dir = '/app/pve_server/pretrained/douzero_pretrained'
 players = []
 for position in ['landlord', 'landlord_down', 'landlord_up']:
     players.append(DeepAgent(position, pretrained_dir, use_onnx=True))
