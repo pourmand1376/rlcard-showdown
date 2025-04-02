@@ -1,0 +1,28 @@
+FROM python:3.8-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the PvE server code
+COPY pve_server/ ./pve_server/
+
+# Create directory for pretrained models
+RUN mkdir -p pve_server/pretrained
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Expose the port
+EXPOSE 5000
+
+# Note: You'll need to download and place the pretrained models in pve_server/pretrained
+# before building the image
+CMD ["python", "pve_server/run_douzero.py"] 

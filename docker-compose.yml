@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      - pve
+    environment:
+      - REACT_APP_API_URL=http://backend:8000
+      - REACT_APP_PVE_URL=http://pve:5000
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app/server
+
+  pve:
+    build:
+      context: .
+      dockerfile: Dockerfile.pve
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./pve_server:/app/pve_server
+      - ./pve_server/pretrained:/app/pve_server/pretrained 

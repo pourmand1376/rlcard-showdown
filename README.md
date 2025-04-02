@@ -53,7 +53,13 @@ cd ..
 cd server
 python3 manage.py runserver
 ```
-2. Download the pre-trained models in [Google Drive](https://drive.google.com/file/d/1zx-20xNBDbCFd8GWhZFUkl07lofbNHpy/view?usp=sharing) or [百度网盘](https://pan.baidu.com/s/12MgxVBBz4mgitT74quSWfw) 提取码: qh6s. Extract it in `pve_server/pretrained`.
+2. Download the pre-trained models from [GitHub Releases](https://github.com/pourmand1376/rlcard-showdown/releases/tag/v0.1) (pretrained.zip, 48 MB) or alternatively from [Google Drive](https://drive.google.com/file/d/1zx-20xNBDbCFd8GWhZFUkl07lofbNHpy/view?usp=sharing) or [百度网盘](https://pan.baidu.com/s/12MgxVBBz4mgitT74quSWfw) 提取码: qh6s. Extract it in `pve_server/pretrained`.
+
+```
+cd pve_server
+wget https://github.com/pourmand1376/rlcard-showdown/releases/download/v0.1/pretrained.zip
+unzip -o pretrained.zip -d .
+```
 
 In a new terminal, start the PvE server (i.e., human vs AI) of DouZero with
 ```
