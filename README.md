@@ -1,6 +1,16 @@
 # RLCard Showdown
 This is the GUI support for the [RLCard](https://github.com/datamllab/rlcard) project and [DouZero](https://github.com/kwai/DouZero) project. RLCard-Showdown provides evaluation and visualization tools to help understand the performance of the agents. It includes a replay module, where you can analyze the replays, and a PvE module, where you can play with the AI interactively. Currently, we only support Leduc Hold'em and Dou Dizhu. The frontend is developed with [React](https://reactjs.org/). The backend is based on [Django](https://www.djangoproject.com/) and [Flask](https://flask.palletsprojects.com/). Have fun!
 
+## Quick Links
+- [Official Website](http://www.rlcard.org)
+- [Documentation](docs/README.md)
+- [Tutorial in Jupyter Notebook](https://github.com/datamllab/rlcard-tutorial)
+- [Research Paper](https://www.ijcai.org/Proceedings/2020/764)
+- [Online Demo with DouZero](https://www.douzero.org/)
+- [Data-centric AI Survey](https://arxiv.org/abs/2303.10158)
+- [Awesome Data-centric AI Resources](https://github.com/daochenzha/data-centric-AI)
+
+## Resources
 *   Official Website: [http://www.rlcard.org](http://www.rlcard.org)
 *   Tutorial in Jupyter Notebook: [https://github.com/datamllab/rlcard-tutorial](https://github.com/datamllab/rlcard-tutorial)
 *   Paper: [https://www.ijcai.org/Proceedings/2020/764](https://www.ijcai.org/Proceedings/2020/764)
@@ -19,65 +29,93 @@ Zha, Daochen, et al. "RLCard: A Platform for Reinforcement Learning in Card Game
 }
 ```
 
-## Installation
-RLCard-Showdown has separated frontend and backend. The frontend is built with React and the backend is based on Django and Flask.
+## Installation and Running with Docker
 
-### Prerequisite
-To set up the frontend, you should make sure you have [Node.js](https://nodejs.org/) and NPM installed. Normally you just need to manually install Node.js, and the NPM package would be automatically installed together with Node.js for you. Please refer to its official website for installation of Node.js.
+### Prerequisites
+- Docker installed on your system
+- Docker Compose (optional, for easier management)
 
-You can run the following commands to verify the installation
-```
-node -v
-npm -v
-```
-For backend, make sure that you have **Python 3.6+** and **pip** installed.
-
-### Install Frontend and Backend
-The frontend can be installed with the help of NPM:
-```
-git clone -b master --single-branch --depth=1 https://github.com/datamllab/rlcard-showdown.git
-cd rlcard-showdown
-npm install
-```
-The backend of leaderboard can be installed with
-```
-pip3 install -r requirements.txt
-cd server
-python3 manage.py migrate
-cd ..
-```
-
-### Run RLCard-Showdown
-1. Launch the backend of leaderboard with
-```
-cd server
-python3 manage.py runserver
-```
-2. Download the pre-trained models from [GitHub Releases](https://github.com/pourmand1376/rlcard-showdown/releases/tag/v0.1) (pretrained.zip, 48 MB) or alternatively from [Google Drive](https://drive.google.com/file/d/1zx-20xNBDbCFd8GWhZFUkl07lofbNHpy/view?usp=sharing) or [百度网盘](https://pan.baidu.com/s/12MgxVBBz4mgitT74quSWfw) 提取码: qh6s. Extract it in `pve_server/pretrained`.
-
-```
+### Download Pre-trained Models
+First, download the pre-trained models:
+```bash
 cd pve_server
 wget https://github.com/pourmand1376/rlcard-showdown/releases/download/v0.1/pretrained.zip
 unzip -o pretrained.zip -d .
 ```
 
-In a new terminal, start the PvE server (i.e., human vs AI) of DouZero with
-```
-cd pve_server
-python3 run_douzero.py
-```
-Alternatively, you can start the PvE server interfaced with RLCard:
-```
-cd pve_server
-python3 run_dmc.py
-```
-They are conceptually the same with minor differences in state representation and training time of the pre-trained models (DouZero is fully trained with more than a month, while DMC in RLCard is only trained for hours).
+### Building Docker Images
+Build the three required Docker images:
+```bash
+# Build frontend image
+docker build -t rlcard-frontend -f Dockerfile.frontend .
 
-3. Run the following command in another new terminal under the project folder to start frontend:
+# Build backend image
+docker build -t rlcard-backend -f Dockerfile.backend .
+
+# Build PvE server image
+docker build -t rlcard-pve -f Dockerfile.pve .
 ```
-npm start
+
+### Running the Application
+You can run each component in a separate terminal:
+
+1. Start the frontend (React application):
+```bash
+docker run -p 3000:3000 rlcard-frontend
 ```
-You can view leaderboard at [http://127.0.0.1:3000/](http://127.0.0.1:3000/) and PvE demo of Dou Dizhu at [http://127.0.0.1:3000/pve/doudizhu-demo](http://127.0.0.1:3000/pve/doudizhu-demo). The backend of leaderboard will run in [http://127.0.0.1:8000/](http://127.0.0.1:8000/). The PvE backend will run in [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
+
+2. Start the backend (Django server):
+```bash
+docker run -p 8000:8000 rlcard-backend
+```
+
+3. Start the PvE server (Flask server):
+```bash
+docker run -p 5000:5000 rlcard-pve
+```
+
+### Accessing the Application
+Once all containers are running, you can access:
+- Leaderboard: [http://127.0.0.1:3000/](http://127.0.0.1:3000/)
+- PvE Demo: [http://127.0.0.1:3000/pve/doudizhu-demo](http://127.0.0.1:3000/pve/doudizhu-demo)
+- Backend API: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- PvE Server: [http://127.0.0.1:5000/](http://127.0.0.1:5000/)
+
+### Alternative: Using Docker Compose
+For easier management, you can use Docker Compose. Create a `docker-compose.yml` file with the following content:
+
+```yaml
+version: '3'
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      - pve
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+
+  pve:
+    build:
+      context: .
+      dockerfile: Dockerfile.pve
+    ports:
+      - "5000:5000"
+```
+
+Then run:
+```bash
+docker-compose up
+```
 
 ## Demos
 ![leaderboards](https://github.com/datamllab/rlcard-showdown/blob/master/docs/imgs/leaderboards.png?raw=true)

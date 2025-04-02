@@ -27,7 +27,8 @@ docker-compose up --build
 
 This will start three services:
 - Frontend: http://localhost:3000
-- Backend: http://localhost:8000
+- PvE Demo: http://127.0.0.1:3000/pve/doudizhu-demo
+- Backend: http://localhost:8000/admin
 - PvE Server: http://localhost:5000
 
 ## Development
