@@ -1,0 +1,10 @@
+rlcard[torch]
+Django
+tqdm
+django-cors-headers
+flask>=2.0.0
+flask-cors
+onnx
+onnxruntime
+Jinja2>=3.0.0
+
