@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Clone and install rlcard from the add_hokm branch
+RUN git clone -b add_hokm https://github.com/pourmand1376/rlcard.git && \
+    cd rlcard && \
+    pip install -e .
+
 # Copy the PvE server code
 COPY pve_server/ ./pve_server/
 
