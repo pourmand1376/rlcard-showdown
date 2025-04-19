@@ -1,4 +1,5 @@
 import DoudizhuReplayView from "./DoudizhuReplayView";
 import LeducHoldemReplayView from "./LeducHoldemReplayView";
+import HokmReplayView from "./HokmReplayView";
 
-export {DoudizhuReplayView, LeducHoldemReplayView};
+export {DoudizhuReplayView, LeducHoldemReplayView, HokmReplayView};

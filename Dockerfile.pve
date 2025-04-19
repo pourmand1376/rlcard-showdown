@@ -29,6 +29,5 @@ ENV PYTHONUNBUFFERED=1
 # Expose the port
 EXPOSE 5000
 
-# Note: You'll need to download and place the pretrained models in pve_server/pretrained
-# before building the image
-CMD ["python", "pve_server/run_dmc.py"] 
+# Run the combined server that supports both DMC and Hokm
+CMD ["python", "pve_server/run_combined.py"] 

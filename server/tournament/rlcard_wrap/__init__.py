@@ -1,6 +1,7 @@
 import rlcard
 from .leduc_holdem_random_model import LeducHoldemRandomModelSpec
 from .doudizhu_random_model import DoudizhuRandomModelSpec
+from .hokm_random_model import HokmRandomModelSpec
 
 
 # Register Leduc Holdem Random Model
@@ -8,6 +9,9 @@ rlcard.models.registration.model_registry.model_specs['leduc-holdem-random'] = L
 
 # Register Doudizhu Random Model
 rlcard.models.registration.model_registry.model_specs['doudizhu-random'] = DoudizhuRandomModelSpec()
+
+# Register Hokm Random Model
+rlcard.models.registration.model_registry.model_specs['hokm-random'] = HokmRandomModelSpec()
 
 # The models we are concerned
 MODEL_IDS = {}
@@ -20,6 +24,10 @@ MODEL_IDS['leduc-holdem'] = [
 MODEL_IDS['doudizhu'] = [
         'doudizhu-random',
         'doudizhu-rule-v1',
+        ]
+
+MODEL_IDS['hokm'] = [
+        'hokm-random',
         ]
 
 

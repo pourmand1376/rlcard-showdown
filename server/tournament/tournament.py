@@ -36,6 +36,10 @@ class Tournament(object):
                     agents = [self.models[i].agents[0], self.models[j].agents[1]]
                     names = [self.model_ids[i], self.model_ids[j]]
                     data, payoffs, wins = leduc_holdem_tournament(self.game, agents, names, self.num_eval_games)
+                elif self.game == 'hokm':
+                    agents = [self.models[i].agents[0], self.models[j].agents[1], self.models[i].agents[2], self.models[j].agents[3]]
+                    names = [self.model_ids[i], self.model_ids[j], self.model_ids[i], self.model_ids[j]]
+                    data, payoffs, wins = hokm_tournament(self.game, agents, names, self.num_eval_games)
                 mean_payoff = np.mean(payoffs)
                 print('Average payoff:', mean_payoff)
                 print()
@@ -161,6 +165,54 @@ def leduc_holdem_tournament(game, agents, names, num_eval_games):
         payoffs.append(env.get_payoffs()[0])
     return json_data, payoffs, wins
 
+def hokm_tournament(game, agents, names, num_eval_games):
+    env = rlcard.make(game, config={'allow_raw_data': True})
+    env.set_agents(agents)
+    payoffs = []
+    json_data = []
+    wins = []
+    for _ in tqdm(range(num_eval_games)):
+        data = {}
+        roles = ['team1', 'team2', 'team1', 'team2']
+        data['playerInfo'] = [{'id': i, 'index': i, 'role': roles[i], 'agentInfo': {'name': names[i]}} for i in range(env.num_players)]
+        state, player_id = env.reset()
+        perfect = env.get_perfect_information()
+        data['initHands'] = perfect['hand_cards_with_suit']
+        data['hokm'] = perfect['hokm_suit']
+        current_hand_cards = perfect['hand_cards_with_suit'].copy()
+        for i in range(len(current_hand_cards)):
+            current_hand_cards[i] = current_hand_cards[i].split()
+        data['moveHistory'] = []
+        while not env.is_over():
+            action, info = env.agents[player_id].eval_step(state)
+            history = {}
+            history['playerIdx'] = player_id
+            if env.agents[player_id].use_raw:
+                _action = action
+            else:
+                _action = env._decode_action(action)
+            history['move'] = _calculate_hokm_move(_action, player_id, current_hand_cards)
+            history['info'] = info
+
+            data['moveHistory'].append(history)
+            state, player_id = env.step(action, env.agents[player_id].use_raw)
+        data = json.dumps(str(data))
+        json_data.append(data)
+        if env.get_payoffs()[0] > 0:
+            wins.append(True)
+        else:
+            wins.append(False)
+        payoffs.append(env.get_payoffs()[0])
+    return json_data, payoffs, wins
+
+def _calculate_hokm_move(action, player_id, current_hand_cards):
+    if action == 'pass' or action == 'hearts' or action == 'spades' or action == 'diamonds' or action == 'clubs':
+        return action
+    for hand_card in current_hand_cards[player_id]:
+        if hand_card == action:
+            current_hand_cards[player_id].remove(hand_card)
+            return hand_card
+    return action
 
 if __name__=='__main__':
     game = 'leduc-holdem'

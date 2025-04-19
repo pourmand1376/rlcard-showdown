@@ -1166,7 +1166,7 @@ function PvEDoudizhuDemoView() {
                         </>
                     )}
                     <p style={{ margin: '4pt' }}>
-                        Zha, Daochen et al. “DouZero: Mastering DouDizhu with Self-Play Deep Reinforcement Learning.”
+                        Zha, Daochen et al. "DouZero: Mastering DouDizhu with Self-Play Deep Reinforcement Learning."
                         ICML (2021).
                     </p>
                     <pre style={{ overflowX: 'auto' }}>

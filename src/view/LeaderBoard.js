@@ -26,6 +26,7 @@ import { apiUrl } from '../utils/config';
 const gameList = [
     { game: 'leduc-holdem', dispName: "Leduc Hold'em" },
     { game: 'doudizhu', dispName: 'Dou Dizhu' },
+    { game: 'hokm', dispName: 'Hokm' },
 ];
 
 // {'doudizhu': ['agent1', 'agent2', 'agent3']}
