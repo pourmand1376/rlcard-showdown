@@ -131,50 +131,40 @@ function PvEHokmDemoView() {
   const [currentTrick, setCurrentTrick] = useState([]);
   const [lastCompletedTrick, setLastCompletedTrick] = useState(null);
   const [lastTrickWinner, setLastTrickWinner] = useState(null);
-  const [showingCompletedTrick, setShowingCompletedTrick] = useState(false);
-  const [completedTricks, setCompletedTricks] = useState([]);
   const [tricksWon, setTricksWon] = useState([0, 0, 0, 0]);
   const [teamScores, setTeamScores] = useState([0, 0]);
   const [gameOver, setGameOver] = useState(false);
   const [message, setMessage] = useState('');
   const [showGameOverDialog, setShowGameOverDialog] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
   const [previousPlayer, setPreviousPlayer] = useState(null);
-  const [debugTrickCaptures, setDebugTrickCaptures] = useState([]);
+  const [lastServerResponse, setLastServerResponse] = useState(null);
+  const [showServerResponse, setShowServerResponse] = useState(false);
+  const [gameHistory, setGameHistory] = useState([]);
+  const [showGameHistory, setShowGameHistory] = useState(false);
   
   // Monitor currentTrick changes
   useEffect(() => {
-    console.log("Current trick updated:", currentTrick);
     // If we see 4 cards in the current trick, make a note of it
     if (currentTrick.length === 4) {
-      console.log("FULL TRICK DETECTED:", JSON.stringify(currentTrick));
-      // Backup safety - whenever we see 4 cards, save this as a potential completed trick
-      setDebugTrickCaptures(prev => [...prev, [...currentTrick]]);
+      // This is a full trick
     }
   }, [currentTrick]);
   
   // Monitor player changes - this can help detect trick completion
   useEffect(() => {
-    console.log(`Player changed from ${previousPlayer} to ${currentPlayer}`);
-    
     // If we have 4 cards and the player changes, this likely means a trick was completed
     if (currentTrick.length === 4 && previousPlayer !== null) {
-      console.log("TRICK COMPLETION DETECTED via player change");
-      
       // Save this completed trick
       const completedTrick = [...currentTrick];
       
       // The previous player is likely the winner
       setLastCompletedTrick(completedTrick);
       setLastTrickWinner(previousPlayer);
-      
-      // Add to debug captures
-      setDebugTrickCaptures(prev => [...prev, completedTrick]);
     }
     
     setPreviousPlayer(currentPlayer);
   }, [currentPlayer]);
-  
+
   // Card suit symbols and colors
   const suitSymbols = {
     'H': '♥',
@@ -205,6 +195,9 @@ function PvEHokmDemoView() {
     try {
       const response = await axios.post(`${PVE_SERVER_URL}/start_game`);
       if (response.data.status === 0) {
+        // Store the complete server response
+        setLastServerResponse(response.data);
+        
         setPlayerHand(response.data.player_hand);
         setCurrentPlayer(response.data.current_player);
         setTrumpSuit(response.data.trump_suit);
@@ -212,11 +205,10 @@ function PvEHokmDemoView() {
         setCurrentTrick([]);
         setLastCompletedTrick(null);
         setLastTrickWinner(null);
-        setShowingCompletedTrick(false);
-        setCompletedTricks([]);
         setTricksWon([0, 0, 0, 0]);
         setTeamScores([0, 0]);
         setGameOver(false);
+        setGameHistory(response.data.game_history || []);
         setMessage('Game started! Choose a trump suit.');
       } else {
         setMessage('Error starting game: ' + response.data.message);
@@ -236,6 +228,9 @@ function PvEHokmDemoView() {
       const response = await axios.post(`${PVE_SERVER_URL}/choose_trump`, formData);
       
       if (response.data.status === 0) {
+        // Store the complete server response
+        setLastServerResponse(response.data);
+        
         updateGameState(response.data);
         setMessage(`Trump suit chosen: ${suitNames[suit]}. Your turn!`);
       } else {
@@ -261,6 +256,9 @@ function PvEHokmDemoView() {
       const response = await axios.post(`${PVE_SERVER_URL}/play_card`, formData);
       
       if (response.data.status === 0) {
+        // Store the complete server response
+        setLastServerResponse(response.data);
+        
         updateGameState(response.data);
         setMessage(`You played ${card}. ${response.data.message}`);
       } else {
@@ -278,18 +276,34 @@ function PvEHokmDemoView() {
     setCurrentPlayer(data.current_player);
     setTrumpSuit(data.trump_suit);
     
-    // Log current state for debugging
-    console.log('Current trick length:', currentTrick.length);
-    console.log('Current trick data:', JSON.stringify(currentTrick));
-    console.log('Incoming trick:', JSON.stringify(data.current_trick));
-    console.log('Current tricks won:', tricksWon);
-    console.log('Incoming tricks won:', data.tricks_won);
+    // Store game history if available
+    if (data.game_history) {
+      setGameHistory(data.game_history);
+    }
+    
+    // Check if we need to convert the trick data format
+    let formattedCurrentTrick = data.current_trick;
+    if (data.current_trick && data.current_trick.length > 0) {
+      // Check if data is already in the expected format with player_id
+      const hasCorrectFormat = data.current_trick[0].hasOwnProperty('player_id');
+      
+      if (!hasCorrectFormat) {
+        // Format conversion needed - might need to adapt this based on actual format
+        formattedCurrentTrick = data.current_trick.map((card, index) => {
+          // Try to determine the player who played this card
+          // This is a simplification - the actual player might be different
+          const potentialPlayer = (data.current_player - data.current_trick.length + index + 4) % 4;
+          return {
+            card: card,
+            player_id: potentialPlayer
+          };
+        });
+      }
+    }
     
     // Check if the tricks_won array has changed, indicating a player won a trick
     const tricksWonChanged = data.tricks_won && 
       JSON.stringify(tricksWon) !== JSON.stringify(data.tricks_won);
-    
-    console.log('Tricks won changed:', tricksWonChanged);
     
     // If tricks won changed, find out who won
     let winner = null;
@@ -300,50 +314,9 @@ function PvEHokmDemoView() {
           break;
         }
       }
-      console.log('Detected winner:', winner);
     }
     
-    // Better detection for completed tricks
-    // A trick is completed when:
-    // 1. We had exactly 4 cards in the current trick (a complete trick), and
-    // 2. The incoming data has an empty trick array, or
-    // 3. The tricks won counter has changed
-    // 4. And the game isn't over yet
-    const trickJustCompleted = 
-      currentTrick.length === 4 && 
-      ((!data.current_trick || data.current_trick.length === 0) || tricksWonChanged) &&
-      !gameOver;
-    
-    console.log('Trick just completed:', trickJustCompleted);
-    
-    // CRITICAL FIX: Store the current trick BEFORE updating state
-    // This is needed because state updates are asynchronous
-    const completedTrick = trickJustCompleted ? [...currentTrick] : null;
-    
-    if (trickJustCompleted) {
-      console.log('Trick completed!', JSON.stringify(completedTrick));
-      
-      // Set last completed trick directly with the local copy, not from state
-      setLastCompletedTrick(completedTrick);
-      setLastTrickWinner(winner);
-      setShowingCompletedTrick(true);
-      
-      // Check if we saved it correctly
-      setTimeout(() => {
-        console.log('Did we save the completed trick?', lastCompletedTrick);
-      }, 100);
-      
-      // Set a timeout to clear the completed trick after 2 seconds
-      setTimeout(() => {
-        console.log('Clearing completed trick display');
-        setShowingCompletedTrick(false);
-        setCurrentTrick(data.current_trick || []);
-      }, 2000);
-    } else {
-      // No trick completion, just update normally
-      setCurrentTrick(data.current_trick || []);
-    }
-    
+    setCurrentTrick(formattedCurrentTrick || []);
     setTricksWon(data.tricks_won || [0, 0, 0, 0]);
     setTeamScores(data.team_scores || [0, 0]);
     setGameOver(data.game_over || false);
@@ -383,76 +356,70 @@ function PvEHokmDemoView() {
     return cardElement;
   };
   
-  // Render the trick area
-  const renderTrickArea = () => {
-    // Determine which trick to show - the current one or the last completed one during the delay
-    const trickToShow = showingCompletedTrick ? lastCompletedTrick : currentTrick;
-    const prevTrick = lastCompletedTrick || [];
-    
-    console.log("Rendering trick area. Current trick:", currentTrick);
-    console.log("Last completed trick:", lastCompletedTrick);
-    
-    return (
-      <div>
-        <Paper className={classes.trickArea}>
-          <Typography variant="h6" gutterBottom>
-            {showingCompletedTrick ? "Completed Trick" : "Current Trick"}
-          </Typography>
-          <div>
-            {(!trickToShow || trickToShow.length === 0) ? (
-              <Typography variant="body1">No cards played yet</Typography>
-            ) : (
-              trickToShow.map((play, index) => (
-                <div key={index} style={{ display: 'inline-block', margin: '10px' }}>
-                  <Typography variant="body2">Player {play.player_id}</Typography>
-                  {renderCard(play.card)}
-                </div>
-              ))
-            )}
-          </div>
-          {showingCompletedTrick && lastTrickWinner !== null && (
-            <Typography variant="body1" style={{ marginTop: '10px', fontWeight: 'bold', color: '#4caf50' }}>
-              Player {lastTrickWinner} won this trick
-            </Typography>
-          )}
-        </Paper>
-        
-        {/* Previous trick display */}
-        {lastCompletedTrick && !showingCompletedTrick && (
-          <Paper className={classes.trickArea} style={{ marginTop: '16px' }}>
-            <Typography variant="h6" gutterBottom>
-              Previous Trick ({prevTrick.length} cards)
-            </Typography>
-            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {prevTrick.map((play, index) => (
-                <div key={index} style={{ 
+  // new helper to render any trick
+  const renderSingleTrick = (title, trick = [], winner = null) => (
+    <Paper 
+      className={classes.trickArea} 
+      style={{ marginTop: title === 'Previous Trick' ? '16px' : undefined }}
+    >
+      <Typography variant="h6" gutterBottom>
+        {title} {title === 'Previous Trick' ? `(${trick.length} cards)` : ''}
+      </Typography>
+
+      {trick.length === 0
+        ? <Typography variant="body1">No cards played yet</Typography>
+        : (
+          <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {trick.map((play, i) => (
+              <div 
+                key={i} 
+                style={{
                   margin: '10px',
-                  padding: '5px',
-                  border: lastTrickWinner === play.player_id ? '2px solid #4caf50' : 'none',
+                  padding: title === 'Previous Trick' ? '5px' : undefined,
+                  border: title === 'Previous Trick' && play.player_id === winner
+                    ? '2px solid #4caf50'
+                    : 'none',
                   borderRadius: '4px',
-                  background: lastTrickWinner === play.player_id ? 'rgba(76, 175, 80, 0.1)' : 'transparent'
-                }}>
-                  <Typography variant="body2" align="center">
-                    Player {play.player_id} 
-                    {lastTrickWinner === play.player_id && (
-                      <span style={{ color: '#4caf50', marginLeft: '5px' }}>👑</span>
-                    )}
-                  </Typography>
-                  {renderCard(play.card)}
-                </div>
-              ))}
-            </div>
-            {prevTrick.length < 4 && (
-              <Typography variant="body2" color="error" style={{ marginTop: '10px', textAlign: 'center' }}>
-                Note: Only {prevTrick.length} cards were recorded for this trick.
-              </Typography>
-            )}
-          </Paper>
-        )}
-      </div>
-    );
-  };
-  
+                  background: title === 'Previous Trick' && play.player_id === winner
+                    ? 'rgba(76,175,80,0.1)'
+                    : 'transparent'
+                }}
+              >
+                <Typography variant="body2" align="center">
+                  Player {play.player_id}
+                  {title === 'Previous Trick' && play.player_id === winner && (
+                    <span style={{ color: '#4caf50', marginLeft: '5px' }}>👑</span>
+                  )}
+                </Typography>
+                {renderCard(play.card)}
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {title === 'Completed Trick' && lastTrickWinner !== null && (
+        <Typography 
+          variant="body1" 
+          style={{ marginTop: '10px', fontWeight: 'bold', color: '#4caf50' }}
+        >
+          Player {lastTrickWinner} won this trick
+        </Typography>
+      )}
+    </Paper>
+  );
+
+  const renderTrickArea = () => (
+    <div>
+      {renderSingleTrick('Current Trick', currentTrick, null)}
+      {lastCompletedTrick && renderSingleTrick(
+        'Previous Trick',
+        lastCompletedTrick,
+        lastTrickWinner
+      )}
+    </div>
+  );
+
   // Render the trump selection UI
   const renderTrumpSelection = () => {
     if (trumpSuit !== null) return null;
@@ -510,6 +477,234 @@ function PvEHokmDemoView() {
     );
   };
   
+  // Toggle server response display
+  const toggleServerResponse = () => {
+    setShowServerResponse(!showServerResponse);
+  };
+  
+  // Toggle game history display
+  const toggleGameHistory = () => {
+    setShowGameHistory(!showGameHistory);
+  };
+  
+  // Render server response
+  const renderServerResponse = () => {
+    if (!showServerResponse || !lastServerResponse) return null;
+    
+    return (
+      <Paper style={{ padding: '16px', marginTop: '16px', backgroundColor: '#f5f5f5' }}>
+        <Typography variant="h6" gutterBottom>
+          Last Server Response
+          <Button 
+            size="small" 
+            style={{ marginLeft: '16px' }}
+            onClick={() => {
+              // Copy to clipboard
+              navigator.clipboard.writeText(JSON.stringify(lastServerResponse, null, 2))
+                .then(() => setMessage("Response copied to clipboard"))
+                .catch(err => console.error('Failed to copy: ', err));
+            }}
+          >
+            Copy
+          </Button>
+        </Typography>
+        <pre style={{ 
+          overflowX: 'auto', 
+          backgroundColor: '#2b2b2b',
+          color: '#e6e6e6',
+          padding: '12px',
+          borderRadius: '4px',
+          fontSize: '12px',
+          maxHeight: '400px',
+          overflowY: 'auto'
+        }}>
+          {JSON.stringify(lastServerResponse, null, 2)}
+        </pre>
+      </Paper>
+    );
+  };
+  
+  // Render game history
+  const renderGameHistory = () => {
+    if (!showGameHistory || !gameHistory || gameHistory.length === 0) return null;
+    
+    // Group play actions into tricks (groups of 4 cards)
+    const tricks = [];
+    let currentTrick = [];
+    let trickWinners = [];
+    
+    // First pass: collect all play actions into tricks
+    gameHistory.forEach((event, index) => {
+      if (event.action === 'play') {
+        currentTrick.push(event);
+        
+        // When we have 4 cards, that's a complete trick
+        if (currentTrick.length === 4) {
+          tricks.push([...currentTrick]);
+          currentTrick = [];
+          
+          // The next player must be the winner of this trick
+          // We'll find this in the second pass
+        }
+      }
+    });
+    
+    // If there's an incomplete trick at the end, add it too
+    if (currentTrick.length > 0) {
+      tricks.push([...currentTrick]);
+    }
+    
+    // Second pass: determine trick winners by finding the player who plays next
+    for (let i = 0; i < tricks.length; i++) {
+      const trick = tricks[i];
+      if (trick.length === 4 && i < tricks.length - 1) {
+        // The player who starts the next trick is the winner of this trick
+        const nextTrickStarter = (i + 1 < tricks.length && tricks[i + 1].length > 0) 
+          ? tricks[i + 1][0].player_id 
+          : null;
+        trickWinners[i] = nextTrickStarter;
+      }
+    }
+    
+    // Find trump suit events
+    const trumpEvents = gameHistory.filter(event => event.action === 'choose_trump');
+    const trumpSuit = trumpEvents.length > 0 ? trumpEvents[0].suit : null;
+    
+    return (
+      <Paper style={{ padding: '16px', marginTop: '16px', backgroundColor: '#f0f7ff' }}>
+        <Typography variant="h6" gutterBottom>
+          Game History
+          {trumpSuit && (
+            <span style={{ marginLeft: '16px', fontSize: '0.9rem' }}>
+              Trump: <span className={classes[trumpSuit.toLowerCase() === 'h' || trumpSuit.toLowerCase() === 'd' ? 'hearts' : 'spades']}>
+                {trumpSuit === 'H' ? '♥' : trumpSuit === 'S' ? '♠' : trumpSuit === 'D' ? '♦' : '♣'}
+              </span>
+            </span>
+          )}
+        </Typography>
+        
+        <div style={{ 
+          maxHeight: '400px', 
+          overflowY: 'auto',
+          backgroundColor: '#fff',
+          padding: '12px',
+          borderRadius: '4px'
+        }}>
+          {/* Trump suit selection */}
+          {trumpEvents.length > 0 && (
+            <div style={{ 
+              marginBottom: '16px', 
+              padding: '8px', 
+              backgroundColor: '#f8f8f8',
+              borderRadius: '4px',
+              borderLeft: '4px solid #2196f3'
+            }}>
+              <Typography variant="body2" style={{ fontWeight: 'bold' }}>
+                {trumpEvents[0].player_id === 0 ? 'You' : `Player ${trumpEvents[0].player_id}`} chose trump suit: 
+                <span className={classes[trumpEvents[0].suit.toLowerCase() === 'h' || trumpEvents[0].suit.toLowerCase() === 'd' ? 'hearts' : 'spades']} style={{ marginLeft: '8px', fontWeight: 'bold' }}>
+                  {trumpEvents[0].suit === 'H' ? '♥' : trumpEvents[0].suit === 'S' ? '♠' : trumpEvents[0].suit === 'D' ? '♦' : '♣'}
+                </span>
+              </Typography>
+            </div>
+          )}
+          
+          {/* Render tricks */}
+          {tricks.map((trick, trickIndex) => (
+            <div 
+              key={trickIndex} 
+              style={{ 
+                marginBottom: '16px',
+                padding: '8px',
+                backgroundColor: '#f9f9f9',
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <Typography variant="subtitle2">
+                  Trick {trickIndex + 1}
+                </Typography>
+                {trickWinners[trickIndex] !== undefined && (
+                  <Typography variant="body2" style={{ 
+                    backgroundColor: '#e8f5e9',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold',
+                    color: '#2e7d32'
+                  }}>
+                    Winner: {trickWinners[trickIndex] === 0 ? 'You' : `Player ${trickWinners[trickIndex]}`}
+                  </Typography>
+                )}
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap',
+                justifyContent: 'space-around'
+              }}>
+                {trick.map((play, cardIndex) => (
+                  <div 
+                    key={cardIndex} 
+                    style={{ 
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      margin: '4px',
+                      padding: '4px',
+                      width: '70px',
+                      backgroundColor: play.player_id === 0 ? '#f5f5f5' : 'transparent',
+                      borderRadius: '4px',
+                      border: play.player_id === 0 ? '1px solid #e0e0e0' : 'none'
+                    }}
+                  >
+                    {renderCard(play.card, false, null, true)}
+                    <Typography variant="caption" style={{ 
+                      marginTop: '4px',
+                      fontWeight: play.player_id === 0 ? 'bold' : 'normal'
+                    }}>
+                      {play.player_id === 0 ? 'You' : `P${play.player_id}`}
+                    </Typography>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          
+          {/* Game over message */}
+          {gameHistory.some(event => event.action === 'game_over') && (
+            <div style={{ 
+              marginTop: '16px', 
+              padding: '8px', 
+              backgroundColor: '#fff9c4',
+              borderRadius: '4px',
+              textAlign: 'center'
+            }}>
+              <Typography variant="body1" style={{ fontWeight: 'bold' }}>
+                Game Over!
+              </Typography>
+              <Typography variant="body2">
+                {teamScores[0] > teamScores[1] 
+                  ? 'Team 1 (You & Player 2) wins!' 
+                  : teamScores[0] < teamScores[1] 
+                    ? 'Team 2 (Player 1 & 3) wins!' 
+                    : 'Game ended in a tie!'}
+              </Typography>
+              <Typography variant="body2">
+                Final Score: Team 1: {teamScores[0]} - Team 2: {teamScores[1]}
+              </Typography>
+            </div>
+          )}
+        </div>
+      </Paper>
+    );
+  };
+  
   // Show a game over dialog
   const renderGameOverDialog = () => {
     if (!showGameOverDialog) return null;
@@ -539,91 +734,6 @@ function PvEHokmDemoView() {
           </Button>
         </DialogActions>
       </Dialog>
-    );
-  };
-  
-  // Render a debug panel
-  const renderDebugPanel = () => {
-    if (!showDebug) return null;
-    
-    return (
-      <Paper style={{ padding: '10px', marginTop: '20px', background: '#f5f5f5' }}>
-        <Typography variant="h6">Debug Information</Typography>
-        <pre style={{ fontSize: '12px', overflowX: 'auto' }}>
-          {JSON.stringify({
-            currentTrick: currentTrick,
-            lastCompletedTrick: lastCompletedTrick,
-            tricksWon: tricksWon,
-            currentPlayer: currentPlayer,
-            previousPlayer: previousPlayer,
-            lastTrickWinner: lastTrickWinner
-          }, null, 2)}
-        </pre>
-        <Typography variant="subtitle2" style={{ marginTop: '10px' }}>Debug Trick Captures:</Typography>
-        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-          {debugTrickCaptures.map((trick, index) => (
-            <div key={index} style={{ borderBottom: '1px solid #ddd', paddingBottom: '5px', marginBottom: '5px' }}>
-              <Typography variant="caption">Capture {index + 1}:</Typography>
-              <pre style={{ fontSize: '11px' }}>{JSON.stringify(trick, null, 1)}</pre>
-              <Button 
-                variant="outlined" 
-                size="small" 
-                color="secondary"
-                onClick={() => {
-                  setLastCompletedTrick(trick);
-                  setLastTrickWinner(trick[trick.length - 1].player_id); // Just guess the last player
-                  setShowingCompletedTrick(false);
-                }}
-              >
-                Restore
-              </Button>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: '10px' }}>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            onClick={() => {
-              // Save the current trick as lastCompletedTrick
-              if (currentTrick.length > 0) {
-                setLastCompletedTrick([...currentTrick]);
-                setLastTrickWinner(0);
-                setShowingCompletedTrick(false);
-              }
-            }}
-            style={{ marginRight: '8px' }}
-          >
-            Save Current as Last
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            onClick={() => {
-              // Log the last API response
-              console.log("Current state:", {
-                currentTrick,
-                lastCompletedTrick,
-                tricksWon,
-                currentPlayer
-              });
-            }}
-            style={{ marginRight: '8px' }}
-          >
-            Log State
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="small" 
-            color="secondary"
-            onClick={() => {
-              setDebugTrickCaptures([]);
-            }}
-          >
-            Clear Captures
-          </Button>
-        </div>
-      </Paper>
     );
   };
   
@@ -725,46 +835,28 @@ function PvEHokmDemoView() {
             >
               New Game
             </Button>
-            
-            {/* Debug button - only visible during development */}
-            {process.env.NODE_ENV !== 'production' && (
-              <>
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  onClick={() => {
-                    // Create a test completed trick with 4 cards
-                    const testTrick = [
-                      { player_id: 0, card: 'H4' },
-                      { player_id: 1, card: 'HQ' },
-                      { player_id: 2, card: 'HA' },
-                      { player_id: 3, card: 'HK' }
-                    ];
-                    
-                    // Set this as the last completed trick
-                    setLastCompletedTrick(testTrick);
-                    setLastTrickWinner(2); // Player 2 won with the Ace
-                    setShowingCompletedTrick(false); // Show it as a previous trick, not current
-                    
-                    console.log('Added test trick to lastCompletedTrick:', testTrick);
-                  }}
-                  style={{ marginRight: '10px' }}
-                >
-                  Show Test Trick
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="default"
-                  onClick={() => setShowDebug(!showDebug)}
-                >
-                  {showDebug ? 'Hide Debug' : 'Show Debug'}
-                </Button>
-              </>
-            )}
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={toggleServerResponse}
+              style={{ marginRight: '10px' }}
+            >
+              {showServerResponse ? 'Hide' : 'Show'} Server Response
+            </Button>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={toggleGameHistory}
+            >
+              {showGameHistory ? 'Hide' : 'Show'} Game History
+            </Button>
           </div>
           
-          {/* Debug panel */}
-          {renderDebugPanel()}
+          {/* Server response display */}
+          {renderServerResponse()}
+          
+          {/* Game history display */}
+          {renderGameHistory()}
           
           {/* Game over dialog */}
           {renderGameOverDialog()}
@@ -774,4 +866,4 @@ function PvEHokmDemoView() {
   );
 }
 
-export default PvEHokmDemoView; 
+export default PvEHokmDemoView;

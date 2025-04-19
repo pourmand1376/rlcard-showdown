@@ -48,6 +48,14 @@ class HokmGame:
         if suit in ['H', 'S', 'D', 'C']:
             self.trump_suit = suit
             self.current_player = 0  # Player who chose trump starts
+            
+            # Add to game history
+            self.game_history.append({
+                'action': 'choose_trump',
+                'player_id': 0,  # Always the human player who chooses trump in this game
+                'suit': suit
+            })
+            
             return True
         return False
     
@@ -198,7 +206,8 @@ def start_game():
         'message': 'Game started',
         'player_hand': hokm_game.player_hands[0],
         'current_player': hokm_game.current_player,
-        'trump_suit': hokm_game.trump_suit
+        'trump_suit': hokm_game.trump_suit,
+        'game_history': hokm_game.game_history
     })
 
 @app.route('/choose_trump', methods=['POST'])
@@ -220,7 +229,8 @@ def choose_trump():
                     'current_trick': hokm_game.current_trick,
                     'tricks_won': hokm_game.tricks_won,
                     'team_scores': hokm_game.team_scores,
-                    'game_over': hokm_game.game_over
+                    'game_over': hokm_game.game_over,
+                    'game_history': hokm_game.game_history
                 })
             else:
                 return jsonify({'status': 1, 'message': 'Invalid trump suit'})
@@ -247,7 +257,8 @@ def play_card():
                     'current_trick': hokm_game.current_trick,
                     'tricks_won': hokm_game.tricks_won,
                     'team_scores': hokm_game.team_scores,
-                    'game_over': hokm_game.game_over
+                    'game_over': hokm_game.game_over,
+                    'game_history': hokm_game.game_history
                 })
             else:
                 return jsonify({'status': 1, 'message': msg})
@@ -264,7 +275,8 @@ def game_state():
         'current_trick': hokm_game.current_trick,
         'tricks_won': hokm_game.tricks_won,
         'team_scores': hokm_game.team_scores,
-        'game_over': hokm_game.game_over
+        'game_over': hokm_game.game_over,
+        'game_history': hokm_game.game_history
     })
 
 if __name__ == '__main__':

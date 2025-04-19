@@ -24,3 +24,15 @@ pip_compile: ## compile dependencies
 	$(CONDA_CMD)
 	pip install pip-tools
 	pip-compile requirements.in -o requirements.txt
+
+docker-rebuild: ## Stop, rebuild, and restart Docker containers in detached mode
+	docker compose down
+	docker compose build
+	docker compose up -d
+
+docker-restart: ## Restart Docker containers without rebuilding
+	docker compose down
+	docker compose up -d
+
+docker-logs: ## View Docker container logs
+	docker compose logs -f
